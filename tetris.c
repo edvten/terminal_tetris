@@ -1,71 +1,322 @@
-#include "getch.h"
+#include "tetris.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
-#define WIDTH (10)
-#define HEIGHT (20)
-#define FPS (2)
+char grid[HEIGHT][WIDTH];
+tetramino_t *current_tetramino = NULL;
+bool game_over = false;
 
-void print_grid(int num) {
-        for (int i = 0; i < HEIGHT; i++) {
-                for (int j = 0; j < WIDTH; j++) {
-                        printf("%d", num % 10);
-                }
-                printf("\n");
+static struct termios orig_term;
+
+void init_grid() {
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++) {
+            grid[i][j] = '.';
         }
+    }
 }
 
+void print_grid() {
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++) {
+            printf("%c", grid[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+void init_terminal(struct termios *term) {
+    printf("\x1b[?25l"); /* Hide cursor */
+
+    /* Save current terminal settings */
+    tcgetattr(STDIN_FILENO, &orig_term);
+    *term = orig_term;
+
+    /* Disable echo and canonical mode */
+    term->c_lflag &= ~ECHO;
+    term->c_lflag &= ~ICANON;
+
+    /* Make it polling read (non-blocking) */
+    term->c_cc[VMIN] = 0;
+    term->c_cc[VTIME] = 0;
+    /* Apply changes */
+    tcsetattr(STDIN_FILENO, 0, term);
+}
+
+void deinit_terminal() {
+    tcsetattr(STDIN_FILENO, TCSANOW, &orig_term);
+    printf("\x1b[?25h"); /* Make cursor visible */
+}
+
+void clock_gettime_helper(struct timespec *t) {
+    if (clock_gettime(CLOCK_REALTIME, t) == -1) {
+        perror("clock_gettime");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void get_new_tetramino() {
+    /* TODO: implement randomly selecting from all available tetraminos */
+    /* For time being, create L piece */
+    current_tetramino->center = (point_t){.x = 4, .y = 1};
+    current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = 0};
+    current_tetramino->tetraminos[1] = (point_t){.x = 0, .y = 0};
+    current_tetramino->tetraminos[2] = (point_t){.x = 1, .y = 0};
+    current_tetramino->tetraminos[3] = (point_t){.x = 1, .y = -1};
+
+    current_tetramino->active = true;
+
+    /* Can the piece be legally placed? If not, the game is lost */
+    bool legal = is_legal_move(0, 0);
+    if (!legal)
+        game_over = true;
+
+    /* Discard input from previous tetramino */
+    tcflush(STDIN_FILENO, TCIFLUSH);
+}
+
+void place_tetramino_grid() {
+    for (int i = 0; i < 4; i++) {
+        int x =
+            current_tetramino->center.x + current_tetramino->tetraminos[i].x;
+        int y =
+            current_tetramino->center.y + current_tetramino->tetraminos[i].y;
+
+        grid[y][x] = '#';
+    }
+
+    if (current_tetramino->active == false)
+        check_for_full_lines();
+}
+
+void unplace_tetramino_grid() {
+    for (int i = 0; i < 4; i++) {
+        int x =
+            current_tetramino->center.x + current_tetramino->tetraminos[i].x;
+        int y =
+            current_tetramino->center.y + current_tetramino->tetraminos[i].y;
+
+        grid[y][x] = '.';
+    }
+}
+
+bool is_legal_move(int dx, int dy) {
+    for (int i = 0; i < 4; i++) {
+        int x = current_tetramino->center.x +
+                current_tetramino->tetraminos[i].x + dx;
+        int y = current_tetramino->center.y +
+                current_tetramino->tetraminos[i].y + dy;
+
+        /* If the x-coordinate is invalid OR
+         *    the y-coordinate is invalid OR
+         * the space is occupied */
+        if ((x < 0 || x >= WIDTH) || (y < 0 || y >= HEIGHT) ||
+            (grid[y][x] == '#')) {
+            /* Illegal move */
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void rotate_piece_helper(bool clockwise) {
+    int newx;
+    int newy;
+    for (int i = 0; i < 4; i++) {
+        if (clockwise) {
+            newx = -current_tetramino->tetraminos[i].y;
+            newy = current_tetramino->tetraminos[i].x;
+        } else {
+            newx = current_tetramino->tetraminos[i].y;
+            newy = -current_tetramino->tetraminos[i].x;
+        }
+        current_tetramino->tetraminos[i].x = newx;
+        current_tetramino->tetraminos[i].y = newy;
+    }
+}
+
+void rotate_piece() {
+    rotate_piece_helper(true);
+
+    bool legal = is_legal_move(0, 0);
+    if (!legal) {
+        /* TODO: implement rotation kick */
+        /* We could not rotate, rotate back */
+        rotate_piece_helper(false);
+    }
+}
+
+void check_for_full_lines() {
+    int num_full_lines = 0;
+
+    int row = HEIGHT - 1;
+    int col = 0;
+
+    while (grid[row][col] == '#') {
+        col++;
+
+        if (col == WIDTH) {
+            row--;
+            col = 0;
+            num_full_lines++;
+        }
+        /* Max number of full lines is 4 */
+        if (num_full_lines == 4)
+            break;
+    }
+
+    if (num_full_lines == 0)
+        return;
+
+    printf("HEJSAN");
+
+    /* Move all rows down */
+    for (row = HEIGHT - 1; row > num_full_lines; row--) {
+        for (col = 0; col < WIDTH; col++) {
+            grid[row][col] = grid[row - num_full_lines][col];
+        }
+    }
+
+    /* Fill top rows with nothing */
+    for (row = 0; row < num_full_lines; row++) {
+        for (col = 0; col < WIDTH; col++) {
+            grid[row][col] = '.';
+        }
+    }
+}
+
+void move_piece(char c) {
+    bool legal;
+    switch (c) {
+    case 'a':
+        legal = is_legal_move(-1, 0);
+        if (legal)
+            current_tetramino->center.x--;
+        break;
+    case 'd':
+        legal = is_legal_move(1, 0);
+        if (legal)
+            current_tetramino->center.x++;
+        break;
+    case 's':
+        legal = is_legal_move(0, 1);
+        if (legal)
+            current_tetramino->center.y++;
+        break;
+    case 'r':
+    case 'w':
+        rotate_piece();
+        break;
+    }
+
+    /* Move piece down */
+    legal = is_legal_move(0, 1);
+    if (legal)
+        current_tetramino->center.y++;
+    else {
+        /* Moving the piece down is illegal, which means that the piece should
+         * be placed here */
+        current_tetramino->active = false;
+    }
+}
+
+void update(char c) {
+    if (current_tetramino->active == false) {
+        /* A new tetramino should be created at the top of the screen */
+        get_new_tetramino();
+        place_tetramino_grid();
+    } else {
+        unplace_tetramino_grid();
+
+        move_piece(c);
+
+        place_tetramino_grid();
+    }
+}
+
+int get_key(void) {
+    unsigned char c = 0;
+    ssize_t bytes_read = read(STDIN_FILENO, &c, 1);
+
+    if (bytes_read == 1) {
+        return (int)c;
+    }
+    return -1;
+}
+
+/* Version that clears the input buffer */
+/* int get_key(void) { */
+/*     unsigned char c; */
+/*     int latest_key = -1; */
+
+/*     /\* Clear the input buffer *\/ */
+/*     while (read(STDIN_FILENO, &c, 1) == 1) { */
+/*         latest_key = (int)c; */
+/*     } */
+
+/*     return latest_key; */
+/* } */
+
 int main(int argc, char *argv[]) {
-        printf("\x1b[?25l"); /* Hide cursor */
+    init_grid();
 
-        /* Disable echo in terminal */
-        struct termios term;
-        tcgetattr(fileno(stdin), &term);
+    struct termios term;
+    init_terminal(&term);
 
-        term.c_lflag &= ~ECHO;
-        tcsetattr(fileno(stdin), 0, &term);
+    const double frame_time_microseconds = (1.0 / FPS) * 1e6;
 
-        const double frame_time_microseconds = (1.0 / FPS) * 1e6;
+    current_tetramino = malloc(sizeof(tetramino_t));
+    current_tetramino->active = false;
 
-        char c;
-        int i = 0;
-        struct timespec start, end;
-        while ((c = getch()) != 'c') {
-                if (clock_gettime(CLOCK_REALTIME, &start) == -1) {
-                        perror("clock_gettime");
-                        exit(EXIT_FAILURE);
-                }
-                print_grid(i);
-                printf("\x1b[%dA", HEIGHT); /* move cursor up HEIGHT lines */
-                printf("\x1b[0G");          /* move cursor to column 0 */
-                i++;
-
-                if (clock_gettime(CLOCK_REALTIME, &end) == -1) {
-                        perror("clock_gettime");
-                        exit(EXIT_FAILURE);
-                }
-
-                double elapsed_microseconds =
-                    (end.tv_sec - start.tv_sec) * 1e6 +
-                    (end.tv_nsec - start.tv_nsec) / 1e3;
-
-                /* TODO: what happens if elapsed time is longer than frametime?
-                 */
-                usleep(frame_time_microseconds - elapsed_microseconds);
+    int key;
+    char c;
+    int i = 0;
+    struct timespec start, end;
+    while (!game_over) {
+        key = get_key();
+        if (key == -1) {
+            /* No input */
+            c = ' ';
+        } else {
+            c = (char)key;
         }
 
-        /* Enable echo in the terminal */
-        term.c_lflag |= ECHO;
-        tcsetattr(fileno(stdin), 0, &term);
-        printf("\x1b[?25h"); /* Make cursor visible */
-        return EXIT_SUCCESS;
+        printf("Input: %c\n", c);
+        clock_gettime_helper(&start);
+
+        update(c);
+
+        print_grid();
+
+        printf("\x1b[%dA", HEIGHT + 1); /* move cursor up HEIGHT lines */
+        printf("\x1b[0G");              /* move cursor to column 0 */
+        i++;
+
+        clock_gettime_helper(&end);
+
+        double elapsed_microseconds = (end.tv_sec - start.tv_sec) * 1e6 +
+                                      (end.tv_nsec - start.tv_nsec) / 1e3;
+
+        /* TODO: what happens if elapsed time is longer than frametime?
+         */
+        usleep(frame_time_microseconds - elapsed_microseconds);
+    }
+
+    print_grid();
+    printf("Game Over!");
+
+    deinit_terminal();
+    free(current_tetramino);
+    return EXIT_SUCCESS;
 }
 
 // clang-format off
 // Local Variables:
-// compile-command: "gcc -o tetris tetris.c getch.c"
+// compile-command: "gcc -o tetris tetris.c"
 // End:
 // clang-format on
