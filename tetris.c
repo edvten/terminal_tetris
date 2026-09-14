@@ -152,37 +152,46 @@ void rotate_piece() {
 }
 
 void check_for_full_lines() {
+    int rows_to_be_removed[4] = {-1, -1, -1, -1};
     int num_full_lines = 0;
 
-    int row = HEIGHT - 1;
-    int col = 0;
-
-    while (grid[row][col] == '#') {
-        col++;
-
-        if (col == WIDTH) {
-            row--;
-            col = 0;
-            num_full_lines++;
+    for (int row = HEIGHT - 1; row >= 0; row--) {
+        int col = 0;
+        while (grid[row][col++] == '#') {
+            if (col == WIDTH) {
+                /* This row is full and should be scheduled for removal */
+                rows_to_be_removed[num_full_lines++] = row;
+                break;
+            }
         }
-        /* Max number of full lines is 4 */
-        if (num_full_lines == 4)
-            break;
     }
 
-    if (num_full_lines == 0)
-        return;
+    /* A maximum of four lines can be full at once */
+    for (int i = 0; i < 4; i++) {
+        if (rows_to_be_removed[i] == -1)
+            break;
 
-    /* Move all rows down */
-    for (row = HEIGHT - 1; row > num_full_lines; row--) {
-        for (col = 0; col < WIDTH; col++) {
-            grid[row][col] = grid[row - num_full_lines][col];
+        /* Add i since i rows have already been moved down */
+        int row = rows_to_be_removed[i] + i;
+
+        /* For every row above (and including) this row */
+        while (row > num_full_lines) {
+            /* Replace each row with the one above */
+            for (int col = 0; col < WIDTH; col++) {
+                /* TODO: */
+                /* row - 1 should not cause a bug for the moment because of
+                 * where new pieces are created on the grid but might cause a
+                 * problem in the future */
+                grid[row][col] = grid[row - 1][col];
+            }
+
+            row--;
         }
     }
 
     /* Fill top rows with nothing */
-    for (row = 0; row < num_full_lines; row++) {
-        for (col = 0; col < WIDTH; col++) {
+    for (int row = 0; row < num_full_lines; row++) {
+        for (int col = 0; col < WIDTH; col++) {
             grid[row][col] = '.';
         }
     }
@@ -223,6 +232,7 @@ void update(char c) {
 
     static struct timespec prev_time;
     static bool timespec_initialised = false;
+    /* TODO: implement key repeat logic */
 
     if (!timespec_initialised) {
         clock_gettime_helper(&prev_time);
