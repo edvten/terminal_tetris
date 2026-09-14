@@ -7,7 +7,7 @@
 
 #define WIDTH (10)
 #define HEIGHT (20)
-#define FPS (2)
+#define FPS (60)
 
 /* Data structures */
 

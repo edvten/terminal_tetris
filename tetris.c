@@ -173,8 +173,6 @@ void check_for_full_lines() {
     if (num_full_lines == 0)
         return;
 
-    printf("HEJSAN");
-
     /* Move all rows down */
     for (row = HEIGHT - 1; row > num_full_lines; row--) {
         for (col = 0; col < WIDTH; col++) {
@@ -207,36 +205,53 @@ void move_piece(char c) {
         legal = is_legal_move(0, 1);
         if (legal)
             current_tetramino->center.y++;
+        else {
+            /* Moving the piece down is illegal, which means that the piece
+             * should be placed here */
+            current_tetramino->active = false;
+        }
         break;
     case 'r':
     case 'w':
         rotate_piece();
         break;
     }
-
-    /* Move piece down */
-    legal = is_legal_move(0, 1);
-    if (legal)
-        current_tetramino->center.y++;
-    else {
-        /* Moving the piece down is illegal, which means that the piece should
-         * be placed here */
-        current_tetramino->active = false;
-    }
 }
 
 void update(char c) {
+    static int ticks = 0;
+
+    static struct timespec prev_time;
+    static bool timespec_initialised = false;
+
+    if (!timespec_initialised) {
+        clock_gettime_helper(&prev_time);
+        timespec_initialised = true;
+    }
+
     if (current_tetramino->active == false) {
         /* A new tetramino should be created at the top of the screen */
         get_new_tetramino();
-        place_tetramino_grid();
     } else {
         unplace_tetramino_grid();
 
         move_piece(c);
-
-        place_tetramino_grid();
     }
+
+    /* Gravity at 1 FPS */
+    if ((ticks % FPS) == 0) {
+        /* Move piece down */
+        bool legal = is_legal_move(0, 1);
+        if (legal)
+            current_tetramino->center.y++;
+        else {
+            /* Moving the piece down is illegal, which means that the piece
+             * should be placed here */
+            current_tetramino->active = false;
+        }
+    }
+    place_tetramino_grid();
+    ticks++;
 }
 
 int get_key(void) {
@@ -286,15 +301,14 @@ int main(int argc, char *argv[]) {
             c = (char)key;
         }
 
-        printf("Input: %c\n", c);
         clock_gettime_helper(&start);
 
         update(c);
 
         print_grid();
 
-        printf("\x1b[%dA", HEIGHT + 1); /* move cursor up HEIGHT lines */
-        printf("\x1b[0G");              /* move cursor to column 0 */
+        printf("\x1b[%dA", HEIGHT); /* move cursor up HEIGHT lines */
+        printf("\x1b[0G");          /* move cursor to column 0 */
         i++;
 
         clock_gettime_helper(&end);
