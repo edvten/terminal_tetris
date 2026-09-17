@@ -63,17 +63,61 @@ void clock_gettime_helper(struct timespec *t) {
 }
 
 void get_new_tetramino() {
-    /* TODO: implement randomly selecting from all available tetraminos */
-    /* For time being, create L piece */
     current_tetramino->center = (point_t){.x = 4, .y = 1};
-    current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = 0};
-    current_tetramino->tetraminos[1] = (point_t){.x = 0, .y = 0};
-    current_tetramino->tetraminos[2] = (point_t){.x = 1, .y = 0};
-    current_tetramino->tetraminos[3] = (point_t){.x = 1, .y = -1};
-
     current_tetramino->active = true;
 
-    current_tetramino->blocktype = BLOCK_BLUE;
+    /* NUM_BLOCK_TYPES also includes the empty block type, hence we subtract 1.
+     */
+    /* BLOCK_EMPTY = 0, so we need to add one at the end */
+    BlockType type = (rand() % (NUM_BLOCK_TYPES - 1)) + 1;
+    current_tetramino->blocktype = type;
+
+    switch (type) {
+    case BLOCK_CYAN: // I Piece
+        current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = 0};
+        current_tetramino->tetraminos[1] = (point_t){.x = 0, .y = 0};
+        current_tetramino->tetraminos[2] = (point_t){.x = 1, .y = 0};
+        current_tetramino->tetraminos[3] = (point_t){.x = 2, .y = 0};
+        break;
+    case BLOCK_BLUE: // J Piece
+        current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = -1};
+        current_tetramino->tetraminos[1] = (point_t){.x = -1, .y = 0};
+        current_tetramino->tetraminos[2] = (point_t){.x = 0, .y = 0};
+        current_tetramino->tetraminos[3] = (point_t){.x = 1, .y = 0};
+        break;
+    case BLOCK_ORANGE: // L Piece
+        current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = 0};
+        current_tetramino->tetraminos[1] = (point_t){.x = 0, .y = 0};
+        current_tetramino->tetraminos[2] = (point_t){.x = 1, .y = 0};
+        current_tetramino->tetraminos[3] = (point_t){.x = 1, .y = -1};
+        break;
+    case BLOCK_YELLOW: // O Piece
+        current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = -1};
+        current_tetramino->tetraminos[1] = (point_t){.x = 0, .y = -1};
+        current_tetramino->tetraminos[2] = (point_t){.x = -1, .y = 0};
+        current_tetramino->tetraminos[3] = (point_t){.x = 0, .y = 0};
+        break;
+    case BLOCK_GREEN: // S Piece
+        current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = 0};
+        current_tetramino->tetraminos[1] = (point_t){.x = 0, .y = 0};
+        current_tetramino->tetraminos[2] = (point_t){.x = 0, .y = -1};
+        current_tetramino->tetraminos[3] = (point_t){.x = 1, .y = -1};
+        break;
+    case BLOCK_PURPLE: // T Piece
+        current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = 0};
+        current_tetramino->tetraminos[1] = (point_t){.x = 0, .y = 0};
+        current_tetramino->tetraminos[2] = (point_t){.x = 0, .y = -1};
+        current_tetramino->tetraminos[3] = (point_t){.x = 1, .y = 0};
+        break;
+    case BLOCK_RED: // Z Piece
+        current_tetramino->tetraminos[0] = (point_t){.x = -1, .y = -1};
+        current_tetramino->tetraminos[1] = (point_t){.x = 0, .y = -1};
+        current_tetramino->tetraminos[2] = (point_t){.x = 0, .y = 0};
+        current_tetramino->tetraminos[3] = (point_t){.x = 1, .y = 0};
+        break;
+    default:
+        break;
+    }
 
     /* Can the piece be legally placed? If not, the game is lost */
     bool legal = is_legal_move(0, 0);
@@ -293,6 +337,9 @@ int get_key(void) {
 /* } */
 
 int main(int argc, char *argv[]) {
+    /* Set the seed for random based on current time */
+    srand(time(NULL));
+
     init_grid();
 
     struct termios term;
