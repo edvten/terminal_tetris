@@ -10,7 +10,23 @@
 #define FPS (60)
 
 /* Data structures */
+typedef enum {
+    BLOCK_EMPTY = 0,
+    BLOCK_CYAN,
+    BLOCK_BLUE,
+    BLOCK_ORANGE,
+    BLOCK_YELLOW,
+    BLOCK_GREEN,
+    BLOCK_PURPLE,
+    BLOCK_RED,
+    NUM_BLOCK_TYPES
+} BlockType;
 
+const char *colours[NUM_BLOCK_TYPES] = {
+    "",         "\x1b[36m", "\x1b[34m", "\x1b[38;5;208m",
+    "\x1b[33m", "\x1b[32m", "\x1b[35m", "\x1b[31m"};
+
+#define COLOUR_RESET "\x1b[0m"
 typedef struct point_t {
     int x;
     int y;
@@ -20,11 +36,11 @@ typedef struct tetramino_t {
     point_t center;
     point_t tetraminos[4];
     bool active;
+    BlockType blocktype;
 } tetramino_t;
 
 /* Global state declarations */
-
-extern char grid[HEIGHT][WIDTH];
+extern BlockType grid[HEIGHT][WIDTH];
 extern tetramino_t *current_tetramino;
 
 /* Board and game logic functions */

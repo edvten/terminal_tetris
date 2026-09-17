@@ -6,7 +6,7 @@
 #include <time.h>
 #include <unistd.h>
 
-char grid[HEIGHT][WIDTH];
+BlockType grid[HEIGHT][WIDTH];
 tetramino_t *current_tetramino = NULL;
 bool game_over = false;
 
@@ -15,7 +15,7 @@ static struct termios orig_term;
 void init_grid() {
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            grid[i][j] = '.';
+            grid[i][j] = BLOCK_EMPTY;
         }
     }
 }
@@ -23,7 +23,10 @@ void init_grid() {
 void print_grid() {
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            printf("%c", grid[i][j]);
+            if (grid[i][j] != BLOCK_EMPTY)
+                printf("%s██" COLOUR_RESET, colours[grid[i][j]]);
+            else
+                printf("░░");
         }
         printf("\n");
     }
@@ -70,6 +73,8 @@ void get_new_tetramino() {
 
     current_tetramino->active = true;
 
+    current_tetramino->blocktype = BLOCK_BLUE;
+
     /* Can the piece be legally placed? If not, the game is lost */
     bool legal = is_legal_move(0, 0);
     if (!legal)
@@ -86,7 +91,7 @@ void place_tetramino_grid() {
         int y =
             current_tetramino->center.y + current_tetramino->tetraminos[i].y;
 
-        grid[y][x] = '#';
+        grid[y][x] = current_tetramino->blocktype;
     }
 
     if (current_tetramino->active == false)
@@ -100,7 +105,7 @@ void unplace_tetramino_grid() {
         int y =
             current_tetramino->center.y + current_tetramino->tetraminos[i].y;
 
-        grid[y][x] = '.';
+        grid[y][x] = BLOCK_EMPTY;
     }
 }
 
@@ -115,7 +120,7 @@ bool is_legal_move(int dx, int dy) {
          *    the y-coordinate is invalid OR
          * the space is occupied */
         if ((x < 0 || x >= WIDTH) || (y < 0 || y >= HEIGHT) ||
-            (grid[y][x] == '#')) {
+            (grid[y][x]) != BLOCK_EMPTY) {
             /* Illegal move */
             return false;
         }
@@ -157,7 +162,7 @@ void check_for_full_lines() {
 
     for (int row = HEIGHT - 1; row >= 0; row--) {
         int col = 0;
-        while (grid[row][col++] == '#') {
+        while (grid[row][col++] != BLOCK_EMPTY) {
             if (col == WIDTH) {
                 /* This row is full and should be scheduled for removal */
                 rows_to_be_removed[num_full_lines++] = row;
@@ -192,7 +197,7 @@ void check_for_full_lines() {
     /* Fill top rows with nothing */
     for (int row = 0; row < num_full_lines; row++) {
         for (int col = 0; col < WIDTH; col++) {
-            grid[row][col] = '.';
+            grid[row][col] = BLOCK_EMPTY;
         }
     }
 }
